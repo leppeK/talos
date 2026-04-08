@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/siderolabs/talos/internal/app/machined/pkg/runtime"
+	"github.com/siderolabs/talos/pkg/machinery/resources/config"
 	"github.com/siderolabs/talos/pkg/machinery/resources/files"
 	"github.com/siderolabs/talos/pkg/machinery/resources/network"
 )
@@ -60,6 +61,12 @@ func (ctrl *StatusController) Inputs() []controller.Input {
 			Type:      network.ProbeStatusType,
 			Kind:      controller.InputWeak,
 		},
+		{
+			Namespace: config.NamespaceName,
+			Type:      config.MachineConfigType,
+			ID:        optional.Some(config.ActiveID),
+			Kind:      controller.InputWeak,
+		},
 	}
 }
 
@@ -97,10 +104,21 @@ func (ctrl *StatusController) Run(ctx context.Context, r controller.Runtime, _ *
 		}
 
 		// connectivity
-		// if any probes are defined, use their status, otherwise rely on presence of the default gateway
+		// if any probes are defined, use their status, otherwise rely on presence of the default gateway (unless in airgap mode)
 		probeStatuses, err := safe.ReaderListAll[*network.ProbeStatus](ctx, r)
 		if err != nil {
 			return fmt.Errorf("error getting probe statuses: %w", err)
+		}
+
+		// Check if airgap mode is enabled
+		isAirgap := false
+		cfg, err := safe.ReaderGetByID[*config.MachineConfig](ctx, r, config.ActiveID)
+		if err != nil {
+			if !state.IsNotFoundError(err) {
+				return fmt.Errorf("error getting machine config: %w", err)
+			}
+		} else if cfg != nil && cfg.Config().Machine().Features() != nil && cfg.Config().Machine().Features().AirgapModeEnabled() {
+			isAirgap = true
 		}
 
 		allProbesSuccess := true
@@ -116,18 +134,23 @@ func (ctrl *StatusController) Run(ctx context.Context, r controller.Runtime, _ *
 		if probeStatuses.Len() > 0 && allProbesSuccess {
 			result.ConnectivityReady = true
 		} else if probeStatuses.Len() == 0 {
-			var routes safe.List[*network.RouteStatus]
+			if isAirgap {
+				// In airgap mode, don't require a default gateway
+				result.ConnectivityReady = true
+			} else {
+				var routes safe.List[*network.RouteStatus]
 
-			routes, err = safe.ReaderListAll[*network.RouteStatus](ctx, r)
-			if err != nil {
-				return fmt.Errorf("error getting routes: %w", err)
-			}
+				routes, err = safe.ReaderListAll[*network.RouteStatus](ctx, r)
+				if err != nil {
+					return fmt.Errorf("error getting routes: %w", err)
+				}
 
-			for route := range routes.All() {
-				if value.IsZero(route.TypedSpec().Destination) {
-					result.ConnectivityReady = true
+				for route := range routes.All() {
+					if value.IsZero(route.TypedSpec().Destination) {
+						result.ConnectivityReady = true
 
-					break
+						break
+					}
 				}
 			}
 		}

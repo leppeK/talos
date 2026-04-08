@@ -97,3 +97,8 @@ func (h *HostDNSConfig) ResolveMemberNames() bool {
 func (i *ImageCacheConfig) LocalEnabled() bool {
 	return pointer.SafeDeref(i.CacheLocalEnabled)
 }
+
+// AirgapModeEnabled implements config.Features interface.
+func (f *FeaturesConfig) AirgapModeEnabled() bool {
+	return pointer.SafeDeref(f.AirgapMode)
+}

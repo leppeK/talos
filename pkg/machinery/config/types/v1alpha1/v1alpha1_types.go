@@ -2406,6 +2406,11 @@ type FeaturesConfig struct {
 	//     The 'v2' algorithm prefers more specific prefixes.
 	//     If unset, defaults to 'v1'.
 	FeatureNodeAddressSortAlgorithm string `yaml:"nodeAddressSortAlgorithm,omitempty"`
+	//   description: |
+	//     Enable airgap mode to skip external connectivity checks.
+	//     When enabled, the machine will not require a default gateway route
+	//     for network readiness, allowing clusters to initialize in isolated environments.
+	AirgapMode *bool `yaml:"airgap,omitempty"`
 }
 
 // KubePrism describes the configuration for the KubePrism load balancer.

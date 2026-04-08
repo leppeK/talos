@@ -382,6 +382,7 @@ type Features interface {
 	KubePrism() KubePrism
 	ImageCache() ImageCache
 	NodeAddressSortAlgorithm() nethelpers.AddressSortAlgorithm
+	AirgapModeEnabled() bool
 }
 
 // KubernetesTalosAPIAccess describes the Kubernetes Talos API access features.
